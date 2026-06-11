@@ -1,0 +1,363 @@
+:host { display: block; height: 100%; }
+
+.soql-wrap {
+    padding: 1rem;
+    height: 100%;
+    overflow-y: auto;
+    background: #f3f2f2;
+}
+
+.soql-wrap.utility-mode { padding: 0.5rem; }
+
+/* ── SOQL textarea ──────────────────────────────────── */
+.soql-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 0.75rem;
+    border: 1px solid #d8dde6;
+    border-radius: 4px;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    resize: vertical;
+    tab-size: 4;
+}
+
+.soql-textarea:focus {
+    outline: none;
+    border-color: #1589ee;
+    box-shadow: 0 0 0 2px rgba(21, 137, 238, 0.25);
+}
+
+/* ── Toolbar ────────────────────────────────────────── */
+.toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.history-select {
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid #d8dde6;
+    border-radius: 4px;
+    font-size: 13px;
+    background: #fff;
+    min-width: 220px;
+    cursor: pointer;
+}
+
+.shortcut-hint {
+    margin-left: auto;
+    font-size: 12px;
+    color: #706e6b;
+}
+
+/* ── Error bar ──────────────────────────────────────── */
+.error-bar {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: #fde8e8;
+    border-left: 4px solid #c23934;
+    border-radius: 4px;
+    color: #c23934;
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* ── Export buttons ─────────────────────────────────── */
+.export-group {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* ── Result filter bar ──────────────────────────────── */
+.result-filter-bar {
+    padding: 0.5rem 0.75rem 0;
+}
+
+/* ── Tables ─────────────────────────────────────────── */
+.table-scroll-wrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 460px;
+    border: 1px solid #d8dde6;
+    border-radius: 4px;
+}
+
+.col-header { min-width: 100px; max-width: 280px; font-weight: bold; white-space: nowrap; }
+
+.result-table thead th {
+    position: sticky;
+    top: 0;
+    background: #f3f2f2;
+    z-index: 2;
+}
+
+.clickable-cell { cursor: pointer; }
+.clickable-cell:hover { background: #e8f4ff !important; }
+
+.cell-val     { max-width: 280px; }
+.cell-val-wide { max-width: 400px; word-break: break-all; white-space: pre-wrap; }
+
+/* ── Pagination ─────────────────────────────────────── */
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 0.5rem;
+}
+
+.page-info { font-weight: bold; color: #3e3e3c; font-size: 13px; }
+
+/* ── Spinner ────────────────────────────────────────── */
+.spinner-wrap {
+    position: relative;
+    height: 80px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* ── Object list ────────────────────────────────────── */
+.object-list {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #d8dde6;
+    border-radius: 4px;
+}
+
+.obj-item {
+    padding: 0.4rem 0.75rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f2f2;
+}
+
+.obj-item:hover { background: #f3f2f2; }
+.obj-item_active { background: #e8f4ff; border-left: 3px solid #1589ee; }
+
+.obj-label { font-size: 13px; font-weight: 600; color: #080707; }
+.obj-api   { font-size: 11px; color: #706e6b; font-family: 'Courier New', monospace; }
+
+/* ── Monospace ──────────────────────────────────────── */
+.mono { font-family: 'Courier New', monospace; font-size: 12px; }
+
+/* ── Required dot ───────────────────────────────────── */
+.req-dot { color: #c23934; font-size: 10px; }
+
+/* ── Type badges ────────────────────────────────────── */
+.type-badge {
+    display: inline-block;
+    padding: 0 5px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    background: #e0e0e0;
+    color: #3e3e3c;
+    white-space: nowrap;
+}
+
+.type-string, .type-textarea { background: #d4e4fd; color: #0070d2; }
+.type-id                      { background: #fce7c3; color: #945000; }
+.type-boolean                 { background: #d0ead0; color: #2e7d2e; }
+.type-integer, .type-double, .type-currency, .type-percent { background: #fce7c3; color: #945000; }
+.type-date, .type-datetime, .type-time { background: #e0d9fd; color: #6632a8; }
+.type-reference               { background: #d8f0e8; color: #0a7c5b; }
+.type-picklist, .type-multipicklist { background: #fddde8; color: #ba0517; }
+.type-email, .type-phone, .type-url { background: #e8f0dd; color: #3a6d0a; }
+
+/* ── Empty state ────────────────────────────────────── */
+.empty-state {
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #706e6b;
+    font-size: 15px;
+}
+
+/* ── Record inspector ───────────────────────────────── */
+.open-record-btn {
+    font-size: 12px;
+    color: #1589ee;
+    text-decoration: none;
+}
+
+/* ── Org Limits ─────────────────────────────────────── */
+.limits-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 0.75rem;
+}
+
+.limit-box {
+    background: #fff;
+    border: 1px solid #d8dde6;
+    border-radius: 6px;
+    padding: 0.75rem;
+    border-left: 4px solid #04844b;
+}
+
+.limit-box.limit-yellow { border-left-color: #ffb75d; }
+.limit-box.limit-red    { border-left-color: #c23934; }
+
+.limit-name  { font-size: 12px; font-weight: 600; color: #3e3e3c; margin-bottom: 4px; }
+.limit-nums  { font-size: 13px; margin: 2px 0; }
+.limit-used  { font-weight: 700; font-size: 15px; }
+.limit-max   { color: #706e6b; }
+.limit-pct   { font-size: 11px; color: #706e6b; text-align: right; margin-top: 2px; }
+
+.slds-progress-bar { background: #ecebea; border-radius: 4px; overflow: hidden; }
+.slds-progress-bar__value { display: block; height: 100%; transition: width 0.3s; }
+.prog-green  { background: #04844b; }
+.prog-yellow { background: #ffb75d; }
+.prog-red    { background: #c23934; }
+
+/* ── Import / File drop ─────────────────────────────── */
+.file-drop {
+    border: 2px dashed #c9c7c5;
+    border-radius: 8px;
+    background: #fafaf9;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.file-drop:hover { border-color: #1589ee; background: #f0f8ff; }
+
+.file-input-hidden { display: none; }
+
+.file-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    cursor: pointer;
+    color: #3e3e3c;
+}
+
+.file-chosen { font-size: 13px; color: #3e3e3c; }
+
+.mapping-grid { margin-bottom: 0.5rem; }
+
+/* ── Import results stats ───────────────────────────── */
+.stat-box {
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.stat-success { background: #d4edda; }
+.stat-error   { background: #f8d7da; }
+.stat-num     { font-size: 2rem; font-weight: 700; }
+.stat-lbl     { font-size: 13px; color: #3e3e3c; }
+
+.err-item {
+    padding: 0.25rem 0.5rem;
+    background: #fff4f4;
+    border-left: 3px solid #c23934;
+    margin-bottom: 3px;
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+}
+
+/* ── Tab body ───────────────────────────────────────── */
+.tab-body { padding: 0.75rem 0; }
+
+/* ── Autocomplete chip bar ──────────────────────────── */
+.ac-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 6px 8px;
+    background: #f3f2f2;
+    border: 1px solid #d8dde6;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    min-height: 36px;
+}
+
+.ac-bar-label {
+    font-size: 12px;
+    color: #706e6b;
+    font-weight: 600;
+    white-space: nowrap;
+    margin-right: 2px;
+    flex-shrink: 0;
+}
+
+.ac-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    background: #fff;
+    color: #0070d2;
+    border: 1px solid #0070d2;
+    border-radius: 12px;
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    cursor: pointer;
+    white-space: nowrap;
+    line-height: 1.6;
+    transition: background 0.1s, color 0.1s;
+}
+
+.ac-chip:hover,
+.ac-chip_active {
+    background: #0070d2;
+    color: #fff;
+}
+
+/* ── Toolbar toggles ────────────────────────────────────── */
+.toggle-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: #3e3e3c;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.toggle-check {
+    cursor: pointer;
+    accent-color: #0070d2;
+}
+
+/* ── Save query bar ─────────────────────────────────────── */
+.save-query-bar {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    padding: 6px 8px;
+    background: #f8f7f6;
+    border: 1px solid #d8dde6;
+    border-radius: 4px;
+}
+
+.save-name-input { flex: 1; }
+
+/* ── Record edit input ──────────────────────────────────── */
+.edit-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 3px 6px;
+    border: 1px solid #1589ee;
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: inherit;
+    background: #fff;
+}
+
+.edit-input:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(21, 137, 238, 0.2);
+}

@@ -1,0 +1,402 @@
+<template>
+    <div class={containerClass}>
+
+        <lightning-tabset active-tab-value="soql" onactive={handleTabChange} variant="scoped">
+
+            <!-- ===== SOQL EDITOR TAB ===== -->
+            <lightning-tab label="SOQL Editor" value="soql" icon-name="utility:search">
+                <div class="tab-body">
+                    <div class="slds-card editor-card">
+                        <div class="slds-card__body slds-card__body_inner">
+                            <textarea
+                                class="soql-textarea"
+                                value={query}
+                                oninput={handleQueryInput}
+                                onkeydown={handleKeydown}
+                                onblur={acHide}
+                                onclick={handleTextareaClick}
+                                placeholder="SELECT Id, Name FROM Account LIMIT 10"
+                                rows="8"
+                            ></textarea>
+                            <div class="toolbar slds-m-top_small">
+                                <lightning-button
+                                    label="Run Query"
+                                    variant="brand"
+                                    icon-name="utility:play"
+                                    onclick={runQuery}
+                                    disabled={isLoading}
+                                ></lightning-button>
+                                <lightning-button
+                                    label="Clear"
+                                    onclick={clearQuery}
+                                    disabled={isLoading}
+                                ></lightning-button>
+                                <template lwc:if={hasHistory}>
+                                    <select class="history-select" onchange={loadFromHistory}>
+                                        <option value="">-- History --</option>
+                                        <template for:each={queryHistory} for:item="h">
+                                            <option key={h.value} value={h.value}>{h.label}</option>
+                                        </template>
+                                    </select>
+                                </template>
+                                <template lwc:if={hasSavedQueries}>
+                                    <select class="history-select" onchange={loadSavedQueryFromSelect}>
+                                        <option value="">-- Saved Queries --</option>
+                                        <template for:each={savedQueriesList} for:item="sq">
+                                            <option key={sq.id} value={sq.query}>{sq.name}</option>
+                                        </template>
+                                    </select>
+                                </template>
+                                <lightning-button label="Save" icon-name="utility:bookmark" onclick={toggleSaveInput} variant="neutral" size="small"></lightning-button>
+                                <label class="toggle-label">
+                                    <input type="checkbox" class="toggle-check" onchange={handleQueryAllToggle} />
+                                    QueryAll
+                                </label>
+                                <label class="toggle-label">
+                                    <input type="checkbox" class="toggle-check" onchange={handleToolingToggle} />
+                                    Tooling API
+                                </label>
+                                <span class="shortcut-hint">Ctrl+Enter to run</span>
+                            </div>
+                            <template lwc:if={showSaveInput}>
+                                <div class="save-query-bar slds-m-top_x-small">
+                                    <lightning-input label="" placeholder="Query name..." value={newQueryName} onchange={handleNewQueryName} class="save-name-input"></lightning-input>
+                                    <lightning-button label="Save" variant="brand" onclick={commitSaveQuery} size="small"></lightning-button>
+                                    <lightning-button label="Cancel" onclick={toggleSaveInput} size="small"></lightning-button>
+                                </div>
+                            </template>
+                            <template lwc:if={acVisible}>
+                                <div class="ac-bar">
+                                    <span class="ac-bar-label">{acBarLabel}</span>
+                                    <template for:each={acSuggestions} for:item="s">
+                                        <button key={s.value} type="button" class={s.cls} onmousedown={acSelect} data-value={s.value}>
+                                            {s.label}
+                                        </button>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <template lwc:if={isLoading}>
+                        <div class="spinner-wrap">
+                            <lightning-spinner alternative-text="Running query..." size="medium"></lightning-spinner>
+                        </div>
+                    </template>
+
+                    <template lwc:if={errorMessage}>
+                        <div class="error-bar slds-m-top_small" role="alert">
+                            <lightning-icon icon-name="utility:error" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                            {errorMessage}
+                        </div>
+                    </template>
+
+                    <template lwc:if={hasResults}>
+                        <div class="slds-card slds-m-top_small">
+                            <div class="slds-card__header slds-grid">
+                                <header class="slds-media slds-media_center slds-has-flexi-truncate">
+                                    <div class="slds-media__body">
+                                        <h2 class="slds-card__header-title">{resultSummary}</h2>
+                                    </div>
+                                    <div class="slds-no-flex export-group">
+                                        <lightning-button label="Copy CSV"  onclick={exportCSV}      icon-name="utility:copy"     variant="neutral" size="small"></lightning-button>
+                                        <lightning-button label="Copy JSON" onclick={exportJSON}     icon-name="utility:copy"     variant="neutral" size="small" class="slds-m-left_x-small"></lightning-button>
+                                        <lightning-button label="Copy XLS"  onclick={exportXLS}      icon-name="utility:copy"     variant="neutral" size="small" class="slds-m-left_x-small"></lightning-button>
+                                        <lightning-button label="↓ CSV"     onclick={downloadCSV}    icon-name="utility:download" variant="neutral" size="small" class="slds-m-left_x-small"></lightning-button>
+                                        <lightning-button label="↓ JSON"    onclick={downloadJSON}   icon-name="utility:download" variant="neutral" size="small" class="slds-m-left_x-small"></lightning-button>
+                                    </div>
+                                </header>
+                            </div>
+                            <div class="slds-card__body">
+                                <div class="slds-card__body_inner result-filter-bar">
+                                    <lightning-input
+                                        label=""
+                                        placeholder="Filter rows across all columns..."
+                                        value={resultFilter}
+                                        onchange={handleResultFilter}
+                                        type="search"
+                                    ></lightning-input>
+                                </div>
+                                <div class="table-scroll-wrap slds-m-top_x-small">
+                                    <table class="slds-table slds-table_cell-buffer slds-table_bordered result-table">
+                                        <thead>
+                                            <tr class="slds-line-height_reset">
+                                                <template for:each={columns} for:item="col">
+                                                    <th key={col} scope="col" title={col}>
+                                                        <div class="slds-truncate col-header">{col}</div>
+                                                    </th>
+                                                </template>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <template for:each={processedRows} for:item="row">
+                                                <tr key={row._key}>
+                                                    <template for:each={row.cells} for:item="cell">
+                                                        <td key={cell.key} onclick={copyCell} data-value={cell.val} title="Click to copy" class="clickable-cell">
+                                                            <div class="slds-truncate cell-val">{cell.val}</div>
+                                                        </td>
+                                                    </template>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="pagination slds-m-top_small">
+                                    <lightning-button label="‹ Prev" onclick={prevPage} disabled={isFirstPage}></lightning-button>
+                                    <span class="page-info">{pageInfo}</span>
+                                    <lightning-button label="Next ›" onclick={nextPage} disabled={isLastPage}></lightning-button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </lightning-tab>
+
+            <!-- ===== OBJECT INSPECTOR TAB ===== -->
+            <lightning-tab label="Object Inspector" value="objects" icon-name="utility:connected_apps">
+                <div class="tab-body">
+                    <template lwc:if={isLoadingObjects}>
+                        <div class="spinner-wrap">
+                            <lightning-spinner alternative-text="Loading objects..." size="medium"></lightning-spinner>
+                        </div>
+                    </template>
+                    <div class="slds-grid slds-gutters">
+                        <div class="slds-col slds-size_1-of-3">
+                            <div class="slds-card">
+                                <div class="slds-card__header">
+                                    <h2 class="slds-card__header-title">Objects ({filteredObjectCount})</h2>
+                                </div>
+                                <div class="slds-card__body slds-card__body_inner">
+                                    <lightning-input
+                                        label=""
+                                        placeholder="Search objects..."
+                                        value={objectSearch}
+                                        onchange={handleObjectSearch}
+                                        type="search"
+                                    ></lightning-input>
+                                    <div class="object-list slds-m-top_x-small">
+                                        <template for:each={filteredObjects} for:item="obj">
+                                            <div key={obj.apiName} class={obj.itemClass} onclick={selectObject} data-api-name={obj.apiName}>
+                                                <div class="slds-truncate obj-label">{obj.label}</div>
+                                                <div class="slds-truncate obj-api">{obj.apiName}</div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="slds-col slds-size_2-of-3">
+                            <template lwc:if={selectedObject}>
+                                <div class="slds-card">
+                                    <div class="slds-card__header slds-grid">
+                                        <header class="slds-media slds-media_center slds-has-flexi-truncate">
+                                            <div class="slds-media__body">
+                                                <h2 class="slds-card__header-title">{selectedObject.label} — {filteredFieldCount} fields</h2>
+                                            </div>
+                                            <div class="slds-no-flex">
+                                                <lightning-button label="Copy SELECT *" onclick={copySelectAll} icon-name="utility:copy" variant="neutral" size="small"></lightning-button>
+                                            </div>
+                                        </header>
+                                    </div>
+                                    <div class="slds-card__body">
+                                        <div class="slds-card__body_inner">
+                                            <lightning-input
+                                                label=""
+                                                placeholder="Search fields..."
+                                                value={fieldSearch}
+                                                onchange={handleFieldSearch}
+                                                type="search"
+                                            ></lightning-input>
+                                        </div>
+                                        <div class="table-scroll-wrap slds-m-top_x-small">
+                                            <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                                                <thead>
+                                                    <tr>
+                                                        <th>API Name</th>
+                                                        <th>Label</th>
+                                                        <th>Type</th>
+                                                        <th>Len</th>
+                                                        <th>Req</th>
+                                                        <th>Ref To</th>
+                                                        <th></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <template for:each={filteredFields} for:item="field">
+                                                        <tr key={field.apiName}>
+                                                            <td class="mono">{field.apiName}</td>
+                                                            <td>{field.label}</td>
+                                                            <td><span class={field.typeBadge}>{field.type}</span></td>
+                                                            <td>{field.lenDisplay}</td>
+                                                            <td>
+                                                                <template lwc:if={field.required}>
+                                                                    <span class="req-dot" title="Required">●</span>
+                                                                </template>
+                                                            </td>
+                                                            <td class="mono">{field.referenceTo}</td>
+                                                            <td>
+                                                                <lightning-button-icon
+                                                                    icon-name="utility:copy"
+                                                                    alternative-text="Copy API Name"
+                                                                    onclick={copyText}
+                                                                    data-value={field.apiName}
+                                                                    variant="bare"
+                                                                    size="small"
+                                                                ></lightning-button-icon>
+                                                            </td>
+                                                        </tr>
+                                                    </template>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                            <template lwc:else>
+                                <div class="empty-state">Select an object from the left to inspect its fields</div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </lightning-tab>
+
+            <!-- ===== RECORD INSPECTOR TAB ===== -->
+            <lightning-tab label="Record Inspector" value="record" icon-name="utility:record">
+                <div class="tab-body">
+                    <div class="slds-card">
+                        <div class="slds-card__body slds-card__body_inner">
+                            <div class="slds-grid slds-gutters slds-grid_vertical-align-end">
+                                <div class="slds-col slds-size_2-of-3">
+                                    <lightning-input
+                                        label="Record ID"
+                                        placeholder="Enter 15 or 18-character Salesforce ID"
+                                        value={inspectRecordId}
+                                        onchange={handleRecordIdChange}
+                                        onkeydown={handleRecordIdKeydown}
+                                    ></lightning-input>
+                                </div>
+                                <div class="slds-col slds-size_1-of-3">
+                                    <lightning-button
+                                        label="Inspect"
+                                        variant="brand"
+                                        onclick={inspectRecord}
+                                        disabled={isLoadingRecord}
+                                        icon-name="utility:search"
+                                    ></lightning-button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <template lwc:if={isLoadingRecord}>
+                        <div class="spinner-wrap slds-m-top_medium">
+                            <lightning-spinner alternative-text="Loading record..." size="medium"></lightning-spinner>
+                        </div>
+                    </template>
+
+                    <template lwc:if={recordFields}>
+                        <div class="slds-card slds-m-top_small">
+                            <div class="slds-card__header slds-grid">
+                                <header class="slds-media slds-media_center slds-has-flexi-truncate">
+                                    <div class="slds-media__body">
+                                        <h2 class="slds-card__header-title">{recordObjectType} — {inspectRecordId}</h2>
+                                    </div>
+                                    <div class="slds-no-flex">
+                                        <template lwc:if={editMode}>
+                                            <lightning-button label="Save" variant="brand" onclick={saveRecord} icon-name="utility:save" size="small" disabled={isLoadingRecord}></lightning-button>
+                                            <lightning-button label="Cancel" onclick={cancelEdit} size="small" class="slds-m-left_x-small"></lightning-button>
+                                        </template>
+                                        <template lwc:else>
+                                            <lightning-button label="Edit" onclick={handleEditMode} icon-name="utility:edit" variant="neutral" size="small"></lightning-button>
+                                            <a href={recordUrl} target="_blank" class="slds-button slds-button_neutral open-record-btn slds-m-left_x-small">Open Record ↗</a>
+                                        </template>
+                                    </div>
+                                </header>
+                            </div>
+                            <div class="slds-card__body">
+                                <div class="slds-card__body_inner">
+                                    <lightning-input
+                                        label=""
+                                        placeholder="Filter fields..."
+                                        value={recordFieldSearch}
+                                        onchange={handleRecordFieldSearch}
+                                        type="search"
+                                    ></lightning-input>
+                                </div>
+                                <div class="table-scroll-wrap slds-m-top_x-small">
+                                    <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                                        <thead>
+                                            <tr>
+                                                <th>Label</th>
+                                                <th>API Name</th>
+                                                <th>Value</th>
+                                                <th>Type</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <template for:each={filteredRecordFields} for:item="rf">
+                                                <tr key={rf.apiName}>
+                                                    <td>{rf.label}</td>
+                                                    <td class="mono">{rf.apiName}</td>
+                                                    <td class="cell-val-wide">
+                                                        <template lwc:if={rf.editable}>
+                                                            <input type="text" class="edit-input" value={rf.editVal} data-api-name={rf.apiName} onchange={handleFieldEdit} />
+                                                        </template>
+                                                        <template lwc:else>{rf.displayVal}</template>
+                                                    </td>
+                                                    <td><span class={rf.typeBadge}>{rf.type}</span></td>
+                                                    <td>
+                                                        <lightning-button-icon
+                                                            icon-name="utility:copy"
+                                                            alternative-text="Copy Value"
+                                                            onclick={copyText}
+                                                            data-value={rf.displayVal}
+                                                            variant="bare"
+                                                            size="small"
+                                                        ></lightning-button-icon>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </lightning-tab>
+
+            <!-- ===== ORG LIMITS TAB ===== -->
+            <lightning-tab label="Org Limits" value="limits" icon-name="utility:chart">
+                <div class="tab-body">
+                    <div class="slds-m-bottom_small">
+                        <lightning-button label="Refresh" onclick={loadOrgLimits} disabled={isLoadingLimits} icon-name="utility:refresh"></lightning-button>
+                    </div>
+                    <template lwc:if={isLoadingLimits}>
+                        <div class="spinner-wrap">
+                            <lightning-spinner alternative-text="Loading limits..." size="medium"></lightning-spinner>
+                        </div>
+                    </template>
+                    <div class="limits-grid">
+                        <template for:each={limitsArray} for:item="lim">
+                            <div key={lim.name} class={lim.boxClass}>
+                                <div class="limit-name slds-truncate" title={lim.displayName}>{lim.displayName}</div>
+                                <div class="limit-nums">
+                                    <span class="limit-used">{lim.used}</span>
+                                    <span class="limit-max"> / {lim.max}</span>
+                                </div>
+                                <div class="slds-progress-bar slds-m-top_x-small" role="progressbar" aria-valuenow={lim.pct} aria-valuemin="0" aria-valuemax="100">
+                                    <span class={lim.barClass} style={lim.barStyle}></span>
+                                </div>
+                                <div class="limit-pct">{lim.pctLabel}</div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </lightning-tab>
+
+        </lightning-tabset>
+    </div>
+</template>
