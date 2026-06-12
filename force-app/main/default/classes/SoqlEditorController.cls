@@ -1,5 +1,7 @@
 public with sharing class SoqlEditorController {
 
+    private static final Integer MAX_IMPORT_BATCH = 200;
+
     public class QueryResult {
         @AuraEnabled public List<String> columns;
         @AuraEnabled public List<Map<String, Object>> rows;
@@ -25,10 +27,19 @@ public with sharing class SoqlEditorController {
         }
     }
 
+    // Only SELECT queries are permitted through this controller.
+    private static Boolean isSelectQuery(String query) {
+        return query.trim().toLowerCase().startsWith('select');
+    }
+
     @AuraEnabled
     public static QueryResult executeQuery(String query) {
         QueryResult result = new QueryResult();
         try {
+            if (!isSelectQuery(query)) {
+                result.error = 'Only SELECT queries are permitted.';
+                return result;
+            }
             List<SObject> records = Database.query(query.trim());
             if (!records.isEmpty()) {
                 Map<String, Object> firstFlat = flattenRecord(records[0]);
@@ -49,6 +60,10 @@ public with sharing class SoqlEditorController {
     public static QueryResult executeQueryAll(String query) {
         QueryResult result = new QueryResult();
         try {
+            if (!isSelectQuery(query)) {
+                result.error = 'Only SELECT queries are permitted.';
+                return result;
+            }
             String q = query.trim();
             if (!q.toLowerCase().contains('all rows')) q += ' ALL ROWS';
             List<SObject> records = Database.query(q);
@@ -109,9 +124,28 @@ public with sharing class SoqlEditorController {
         ImportResult result = new ImportResult();
         try {
             List<Object> rawList = (List<Object>) JSON.deserializeUntyped(recordsJson);
+
+            if (rawList.size() > MAX_IMPORT_BATCH) {
+                result.errors.add('Batch size exceeds the maximum of ' + MAX_IMPORT_BATCH + ' records per operation.');
+                result.errorCount = 1;
+                return result;
+            }
+
             Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);
             if (sObjectType == null) {
                 result.errors.add('Unknown object: ' + objectApiName);
+                result.errorCount = 1;
+                return result;
+            }
+
+            Schema.DescribeSObjectResult sod = sObjectType.getDescribe();
+            if (operation == 'insert' && !sod.isCreateable()) {
+                result.errors.add('Insufficient permissions to create ' + objectApiName + ' records.');
+                result.errorCount = 1;
+                return result;
+            }
+            if ((operation == 'update' || operation == 'upsert') && !sod.isUpdateable()) {
+                result.errors.add('Insufficient permissions to update ' + objectApiName + ' records.');
                 result.errorCount = 1;
                 return result;
             }

@@ -41,6 +41,7 @@ public with sharing class OrgMetadataController {
         List<FieldInfo> fields = new List<FieldInfo>();
         Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);
         if (sObjectType == null) return fields;
+        if (!sObjectType.getDescribe().isAccessible()) return fields;
 
         Map<String, Schema.SObjectField> fieldMap = sObjectType.getDescribe().fields.getMap();
         List<String> sortedFieldNames = new List<String>(fieldMap.keySet());
@@ -93,7 +94,11 @@ public with sharing class OrgMetadataController {
     public static String updateRecord(String recordId, String updatesJson) {
         try {
             Id sfId = Id.valueOf(recordId.trim());
-            String objectType = sfId.getSObjectType().getDescribe().getName();
+            Schema.DescribeSObjectResult sod = sfId.getSObjectType().getDescribe();
+            if (!sod.isUpdateable()) {
+                return 'Insufficient permissions to update ' + sod.getName() + ' records.';
+            }
+            String objectType = sod.getName();
             Map<String, Schema.SObjectField> fieldMap =
                 Schema.getGlobalDescribe().get(objectType).getDescribe().fields.getMap();
 
@@ -115,8 +120,10 @@ public with sharing class OrgMetadataController {
             }
             update obj;
             return 'success';
+        } catch (DmlException e) {
+            return e.getDmlMessage(0);
         } catch (Exception e) {
-            return e.getMessage();
+            return 'An error occurred. Please verify the record ID and field values.';
         }
     }
 
@@ -137,7 +144,12 @@ public with sharing class OrgMetadataController {
         Map<String, Object> result = new Map<String, Object>();
         try {
             Id sfId = Id.valueOf(recordId.trim());
-            String objectType = sfId.getSObjectType().getDescribe().getName();
+            Schema.DescribeSObjectResult sod = sfId.getSObjectType().getDescribe();
+            if (!sod.isAccessible()) {
+                result.put('error', 'Insufficient permissions to access ' + sod.getName() + ' records.');
+                return result;
+            }
+            String objectType = sod.getName();
 
             Map<String, Schema.SObjectField> fieldMap =
                 Schema.getGlobalDescribe().get(objectType).getDescribe().fields.getMap();

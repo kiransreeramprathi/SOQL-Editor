@@ -1,17 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomApplication xmlns="http://soap.sforce.com/2006/04/metadata">
+    <brand>
+        <headerColor>#0070D2</headerColor>
+        <shouldOverrideOrgTheme>false</shouldOverrideOrgTheme>
+    </brand>
+    <description>SOQL Editor — developer tooling to replace Salesforce Inspector</description>
+    <formFactors>Small</formFactors>
     <formFactors>Large</formFactors>
     <isNavAutoTempTabsDisabled>false</isNavAutoTempTabsDisabled>
     <isNavPersonalizationDisabled>false</isNavPersonalizationDisabled>
     <isNavTabPersistenceDisabled>false</isNavTabPersistenceDisabled>
     <isOmniPinnedViewEnabled>false</isOmniPinnedViewEnabled>
-    <label>Agentforce Studio</label>
-    <navType>Console</navType>
-    <tabs>standard-AgentforceStudio</tabs>
+    <label>SOQL Editor</label>
+    <navType>Standard</navType>
+    <tabs>SOQL_Editor</tabs>
     <uiType>Lightning</uiType>
-    <workspaceConfig>
-        <mappings>
-            <tab>standard-AgentforceStudio</tab>
-        </mappings>
-    </workspaceConfig>
+    <utilityBar></utilityBar>
 </CustomApplication>
