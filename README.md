@@ -2,7 +2,6 @@
 
 A powerful, developer-focused Salesforce Lightning Web Component that brings a full query workbench, object browser, record inspector, and org limits dashboard into any Salesforce org — no AppExchange package required.
 
-![SOQL Editor screenshot](https://github.com/user-attachments/assets/d1e50969-ee58-4f85-a871-1a8122df9a1f)
 <img width="1909" height="891" alt="image" src="https://github.com/user-attachments/assets/1fe94922-ba22-404c-8cfd-10fb24e9cb0f" />
 
 ---
@@ -47,9 +46,9 @@ A powerful, developer-focused Salesforce Lightning Web Component that brings a f
 ---
 
 ## Screenshots
-
-![Object Inspector](https://github.com/user-attachments/assets/1a8f53ca-f462-4c96-882b-37ea92a72173)
-![Record Inspector](https://github.com/user-attachments/assets/3352cbb9-ea20-4bae-934f-b84d4f18ff6c)
+<img width="1919" height="894" alt="image" src="https://github.com/user-attachments/assets/ff14ae81-36c7-4586-ba38-b510f6f5ccfa" />
+<img width="1914" height="894" alt="image" src="https://github.com/user-attachments/assets/ae6bc231-2938-4eac-b0e9-a649fbae1e12" />
+<img width="1908" height="889" alt="image" src="https://github.com/user-attachments/assets/52d15c44-ccb5-4f37-bf4b-de22b5e564f8" />
 
 ---
 
