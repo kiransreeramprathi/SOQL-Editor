@@ -98,13 +98,15 @@
                                     <div class="slds-media__body">
                                         <h2 class="slds-card__header-title">{resultSummary}</h2>
                                     </div>
-                                    <div class="slds-no-flex export-group">
-                                        <lightning-button label="Copy CSV"  onclick={exportCSV}      icon-name="utility:copy"     variant="neutral" size="small"></lightning-button>
-                                        <lightning-button label="Copy JSON" onclick={exportJSON}     icon-name="utility:copy"     variant="neutral" size="small" class="slds-m-left_x-small"></lightning-button>
-                                        <lightning-button label="Copy XLS"  onclick={exportXLS}      icon-name="utility:copy"     variant="neutral" size="small" class="slds-m-left_x-small"></lightning-button>
-                                        <lightning-button label="↓ CSV"     onclick={downloadCSV}    icon-name="utility:download" variant="neutral" size="small" class="slds-m-left_x-small"></lightning-button>
-                                        <lightning-button label="↓ JSON"    onclick={downloadJSON}   icon-name="utility:download" variant="neutral" size="small" class="slds-m-left_x-small"></lightning-button>
-                                    </div>
+                                    <template lwc:if={hasRows}>
+                                        <div class="slds-no-flex export-group">
+                                            <lightning-button label="Copy CSV"  onclick={exportCSV}      icon-name="utility:copy"     variant="neutral" size="small"></lightning-button>
+                                            <lightning-button label="Copy JSON" onclick={exportJSON}     icon-name="utility:copy"     variant="neutral" size="small" class="slds-m-left_x-small"></lightning-button>
+                                            <lightning-button label="Copy XLS"  onclick={exportXLS}      icon-name="utility:copy"     variant="neutral" size="small" class="slds-m-left_x-small"></lightning-button>
+                                            <lightning-button label="↓ CSV"     onclick={downloadCSV}    icon-name="utility:download" variant="neutral" size="small" class="slds-m-left_x-small"></lightning-button>
+                                            <lightning-button label="↓ JSON"    onclick={downloadJSON}   icon-name="utility:download" variant="neutral" size="small" class="slds-m-left_x-small"></lightning-button>
+                                        </div>
+                                    </template>
                                 </header>
                             </div>
                             <div class="slds-card__body">
@@ -121,9 +123,9 @@
                                     <table class="slds-table slds-table_cell-buffer slds-table_bordered result-table">
                                         <thead>
                                             <tr class="slds-line-height_reset">
-                                                <template for:each={columns} for:item="col">
-                                                    <th key={col} scope="col" title={col}>
-                                                        <div class="slds-truncate col-header">{col}</div>
+                                                <template for:each={columnHeaders} for:item="col">
+                                                    <th key={col.name} scope="col" title={col.name} onclick={handleSortColumn} data-col={col.name} class="sortable-col">
+                                                        <div class="slds-truncate col-header">{col.label}</div>
                                                     </th>
                                                 </template>
                                             </tr>
@@ -136,6 +138,11 @@
                                                             <div class="slds-truncate cell-val">{cell.val}</div>
                                                         </td>
                                                     </template>
+                                                </tr>
+                                            </template>
+                                            <template lwc:if={showEmptyRows}>
+                                                <tr>
+                                                    <td colspan="999" class="empty-rows-cell">No records returned.</td>
                                                 </tr>
                                             </template>
                                         </tbody>

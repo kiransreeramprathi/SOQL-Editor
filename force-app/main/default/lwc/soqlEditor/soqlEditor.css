@@ -93,6 +93,24 @@
 
 .col-header { min-width: 100px; max-width: 280px; font-weight: bold; white-space: nowrap; }
 
+.sortable-col {
+    cursor: pointer;
+    user-select: none;
+}
+
+.sortable-col:hover .col-header {
+    color: #0070d2;
+    text-decoration: underline;
+}
+
+.empty-rows-cell {
+    padding: 2rem;
+    text-align: center;
+    color: #706e6b;
+    font-style: italic;
+    font-size: 14px;
+}
+
 .result-table thead th {
     position: sticky;
     top: 0;

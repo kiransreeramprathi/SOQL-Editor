@@ -71,6 +71,8 @@ export default class SoqlEditor extends LightningElement {
     @track useToolingApi = false;
     @track useQueryAll   = false;
     @track resultFilter  = '';
+    _sortCol = '';
+    _sortAsc = true;
     _qh = [];
 
     // ── Autocomplete ──────────────────────────────────────────
@@ -198,6 +200,8 @@ export default class SoqlEditor extends LightningElement {
         this.queryResult  = null;
         this.currentPage  = 1;
         this.resultFilter = '';
+        this._sortCol     = '';
+        this._sortAsc     = true;
         try {
             let result;
             if (this.useToolingApi) {
@@ -211,7 +215,7 @@ export default class SoqlEditor extends LightningElement {
                 this.errorMessage = result.error;
             } else {
                 this.queryResult = result;
-                this.columns     = result.columns || [];
+                this.columns     = this._orderedColumns(result.columns || [], this.query.trim());
                 this.pushHistory(this.query.trim());
             }
         } catch (err) {
@@ -228,11 +232,66 @@ export default class SoqlEditor extends LightningElement {
         this.columns      = [];
         this.acVisible    = false;
         this.resultFilter = '';
+        this._sortCol     = '';
+        this._sortAsc     = true;
+        this._setTextareaValue('');
     }
 
     handleResultFilter(event) {
         this.resultFilter = event.detail.value;
         this.currentPage  = 1;
+    }
+
+    handleSortColumn(event) {
+        const col = event.currentTarget.dataset.col;
+        if (this._sortCol === col) {
+            this._sortAsc = !this._sortAsc;
+        } else {
+            this._sortCol = col;
+            this._sortAsc = true;
+        }
+    }
+
+    _orderedColumns(serverCols, soql) {
+        if (!serverCols.length) return serverCols;
+        const parsed = this._parseColumnsFromSOQL(soql);
+        if (!parsed || !parsed.length) return serverCols;
+        const lower  = serverCols.map(c => c.toLowerCase());
+        const used   = new Set();
+        const ordered = [];
+        for (const p of parsed) {
+            const idx = lower.indexOf(p.toLowerCase());
+            if (idx >= 0 && !used.has(idx)) {
+                ordered.push(serverCols[idx]);
+                used.add(idx);
+            }
+        }
+        serverCols.forEach((c, i) => { if (!used.has(i)) ordered.push(c); });
+        return ordered;
+    }
+
+    _parseColumnsFromSOQL(soql) {
+        const m = /SELECT\s+([\s\S]+?)\s+FROM\b/i.exec(soql);
+        if (!m) return null;
+        const parts = [];
+        let depth = 0, cur = '';
+        for (const ch of m[1]) {
+            if (ch === '(') { depth++; cur += ch; }
+            else if (ch === ')') { depth--; cur += ch; }
+            else if (ch === ',' && depth === 0) { parts.push(cur.trim()); cur = ''; }
+            else cur += ch;
+        }
+        if (cur.trim()) parts.push(cur.trim());
+        return parts.map(p => {
+            if (!p || p.startsWith('(')) return null;
+            // Alias: e.g., COUNT(Id) total → 'total'
+            const aliasM = /\)\s+(\w+)\s*$/i.exec(p);
+            if (aliasM) return aliasM[1];
+            // Aggregate without alias: COUNT(Id) → 'count'
+            const fnM = /^(\w+)\s*\(/.exec(p);
+            if (fnM) return fnM[1].toLowerCase();
+            return p;
+        }).filter(Boolean);
     }
 
     loadFromHistory(event) {
@@ -285,12 +344,17 @@ export default class SoqlEditor extends LightningElement {
     }
 
     _fallbackCopy(text, successMsg) {
-        const ta = document.createElement('textarea');
-        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-        document.body.appendChild(ta); ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-        this.toast('Copied', successMsg, 'success');
+        try {
+            const ta = document.createElement('textarea');
+            ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.select();
+            // eslint-disable-next-line @lwc/lwc/no-document-query
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            this.toast('Copied', successMsg, 'success');
+        } catch (e) {
+            this.toast('Copy failed', 'Unable to copy to clipboard', 'error');
+        }
     }
 
     _downloadData(text, filename, mime) {
@@ -688,17 +752,30 @@ export default class SoqlEditor extends LightningElement {
     //  GETTERS — SOQL
     // ════════════════════════════════════════════════════════
     get containerClass()  { return `soql-wrap${this.utilityMode ? ' utility-mode' : ''}`; }
-    get hasResults()      { return !!(this.queryResult?.rows?.length); }
+    get hasResults()      { return this.queryResult !== null; }
+    get hasRows()         { return !!(this.queryResult?.rows?.length); }
+    get showEmptyRows()   { return this.queryResult !== null && !this.hasRows; }
     get filteredRows() {
         const rows = this.queryResult?.rows || [];
         const q = (this.resultFilter || '').toLowerCase().trim();
-        if (!q) return rows;
-        return rows.filter(row =>
-            this.columns.some(col => {
-                const v = row[col];
-                return v != null && String(v).toLowerCase().includes(q);
-            })
-        );
+        let result = q
+            ? rows.filter(row =>
+                  this.columns.some(col => {
+                      const v = row[col];
+                      return v != null && String(v).toLowerCase().includes(q);
+                  })
+              )
+            : rows;
+        if (this._sortCol) {
+            const col = this._sortCol;
+            const dir = this._sortAsc ? 1 : -1;
+            result = [...result].sort((a, b) => {
+                const av = a[col] == null ? '' : String(a[col]);
+                const bv = b[col] == null ? '' : String(b[col]);
+                return dir * av.localeCompare(bv, undefined, { numeric: true, sensitivity: 'base' });
+            });
+        }
+        return result;
     }
     get resultSummary() {
         const total    = this.queryResult?.totalRows ?? 0;
@@ -722,6 +799,13 @@ export default class SoqlEditor extends LightningElement {
         if (ctx.type === 'relfield') return `Fields on ${ctx.relPath}:`;
         if (ctx.type === 'value')    return `Values for ${ctx.fieldChain}:`;
         return ctx.objectName ? `Fields on ${ctx.objectName}:` : 'Field suggestions:';
+    }
+
+    get columnHeaders() {
+        return this.columns.map(col => ({
+            name:  col,
+            label: col + (this._sortCol === col ? (this._sortAsc ? ' ▲' : ' ▼') : '')
+        }));
     }
 
     get pagedRows() {
