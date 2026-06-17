@@ -27,6 +27,102 @@ public with sharing class SoqlEditorController {
         }
     }
 
+    private class ExpandResult {
+        String query;
+        List<String> fields; // non-null only when FIELDS() was expanded
+        ExpandResult(String q, List<String> f) { this.query = q; this.fields = f; }
+    }
+
+    // Expands FIELDS(ALL|STANDARD|CUSTOM) into an explicit field list so
+    // Database.query() can execute it. Also returns the field list so callers
+    // can build columns without getPopulatedFieldsAsMap() dropping null fields.
+    private static ExpandResult expandFieldsFunction(String q) {
+        if (!q.toLowerCase().contains('fields(')) return new ExpandResult(q, null);
+        Pattern fp = Pattern.compile('(?i)\\bFIELDS\\s*\\(\\s*(ALL|STANDARD|CUSTOM)\\s*\\)');
+        Matcher fm = fp.matcher(q);
+        if (!fm.find()) return new ExpandResult(q, null);
+        String kind = fm.group(1).toUpperCase();
+        Pattern op = Pattern.compile('(?i)\\bFROM\\s+(\\w+)');
+        Matcher om = op.matcher(q);
+        if (!om.find()) return new ExpandResult(q, null);
+        Schema.SObjectType sot = Schema.getGlobalDescribe().get(om.group(1));
+        if (sot == null) return new ExpandResult(q, null);
+        List<String> names = new List<String>();
+        for (Schema.SObjectField sf : sot.getDescribe().fields.getMap().values()) {
+            Schema.DescribeFieldResult dfr = sf.getDescribe();
+            if (!dfr.isAccessible()) continue;
+            if (kind == 'STANDARD' && dfr.isCustom()) continue;
+            if (kind == 'CUSTOM'   && !dfr.isCustom()) continue;
+            // Skip compound wrapper fields (ADDRESS, LOCATION) — their scalar
+            // components are already present in the field map and will be included.
+            String typeName = dfr.getType().name();
+            if (typeName == 'ADDRESS' || typeName == 'LOCATION') continue;
+            names.add(dfr.getName());
+        }
+        if (names.isEmpty()) return new ExpandResult(q, null);
+        return new ExpandResult(fm.replaceFirst(String.join(names, ', ')), names);
+    }
+
+    // Parses the SELECT clause to extract simple field/relationship names.
+    // Returns null for aggregate or complex queries so the caller can fall back.
+    private static List<String> parseSelectColumns(String soql) {
+        try {
+            String s = soql.trim();
+            if (!s.toUpperCase().startsWith('SELECT')) return null;
+            // Find the first FROM at parenthesis depth 0
+            Integer depth = 0, fromIdx = -1;
+            for (Integer i = 6; i <= s.length() - 4; i++) {
+                String c = s.substring(i, i + 1);
+                if (c == '(') { depth++; continue; }
+                if (c == ')') { depth--; continue; }
+                if (depth == 0 && s.substring(i, i + 4).toUpperCase() == 'FROM') {
+                    String prev = i > 0 ? s.substring(i - 1, i) : ' ';
+                    String next = i + 4 < s.length() ? s.substring(i + 4, i + 5) : ' ';
+                    Boolean preOk  = prev == ' ' || prev == '\n' || prev == '\t' || prev == '\r';
+                    Boolean postOk = next == ' ' || next == '\n' || next == '\t' || next == '\r';
+                    if (preOk && postOk) { fromIdx = i; break; }
+                }
+            }
+            if (fromIdx < 0) return null;
+            String clause = s.substring(6, fromIdx).trim();
+            // Split by comma at depth 0; skip any token containing ( (aggregates/subqueries)
+            List<String> cols = new List<String>();
+            depth = 0;
+            Integer start = 0;
+            for (Integer i = 0; i < clause.length(); i++) {
+                String c = clause.substring(i, i + 1);
+                if (c == '(') depth++;
+                else if (c == ')') depth--;
+                else if (c == ',' && depth == 0) {
+                    String col = clause.substring(start, i).trim();
+                    if (String.isNotBlank(col) && !col.contains('(')) cols.add(col);
+                    start = i + 1;
+                }
+            }
+            String last = clause.substring(start).trim();
+            if (String.isNotBlank(last) && !last.contains('(')) cols.add(last);
+            return cols.isEmpty() ? null : cols;
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    // Resolves a dotted relationship path (e.g. "Account.Name") from a record.
+    private static Object resolveFieldValue(SObject record, String path) {
+        try {
+            if (!path.contains('.')) return record.get(path);
+            List<String> parts = path.split('\\.');
+            SObject current = record;
+            for (Integer i = 0; i < parts.size() - 1; i++) {
+                current = current.getSObject(parts[i]);
+                if (current == null) return null;
+            }
+            return current.get(parts[parts.size() - 1]);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
     // Only SELECT queries are permitted through this controller.
     private static Boolean isSelectQuery(String query) {
         return query.trim().toLowerCase().startsWith('select');
@@ -40,14 +136,38 @@ public with sharing class SoqlEditorController {
                 result.error = 'Only SELECT queries are permitted.';
                 return result;
             }
-            List<SObject> records = Database.query(query.trim());
+            ExpandResult expanded = expandFieldsFunction(query.trim());
+            List<SObject> records = Database.query(expanded.query);
             if (!records.isEmpty()) {
-                Map<String, Object> firstFlat = flattenRecord(records[0]);
-                result.columns = new List<String>(firstFlat.keySet());
-                result.columns.sort();
-                for (SObject record : records) {
-                    result.rows.add(flattenRecord(record));
+                List<Map<String, Object>> flatRows = new List<Map<String, Object>>();
+                // Prefer an explicit column list so null-valued fields are included.
+                // FIELDS() queries use the expanded list; regular queries parse SELECT.
+                List<String> cols = expanded.fields != null
+                    ? expanded.fields
+                    : parseSelectColumns(query.trim());
+                if (cols != null) {
+                    List<String> displayCols = new List<String>(cols);
+                    if (expanded.fields != null) displayCols.sort(); // sort FIELDS() results
+                    result.columns = displayCols;
+                    for (SObject record : records) {
+                        Map<String, Object> row = new Map<String, Object>();
+                        for (String col : cols) {
+                            row.put(col, resolveFieldValue(record, col));
+                        }
+                        flatRows.add(row);
+                    }
+                } else {
+                    // Fallback for aggregate/complex queries
+                    Set<String> colSet = new Set<String>();
+                    for (SObject record : records) {
+                        Map<String, Object> flat = flattenRecord(record);
+                        colSet.addAll(flat.keySet());
+                        flatRows.add(flat);
+                    }
+                    result.columns = new List<String>(colSet);
+                    result.columns.sort();
                 }
+                result.rows = flatRows;
             }
             result.totalRows = records.size();
         } catch (Exception e) {
@@ -64,14 +184,37 @@ public with sharing class SoqlEditorController {
                 result.error = 'Only SELECT queries are permitted.';
                 return result;
             }
-            String q = query.trim();
+            ExpandResult expanded = expandFieldsFunction(query.trim());
+            String q = expanded.query;
             if (!q.toLowerCase().contains('all rows')) q += ' ALL ROWS';
             List<SObject> records = Database.query(q);
             if (!records.isEmpty()) {
-                Map<String, Object> firstFlat = flattenRecord(records[0]);
-                result.columns = new List<String>(firstFlat.keySet());
-                result.columns.sort();
-                for (SObject record : records) result.rows.add(flattenRecord(record));
+                List<Map<String, Object>> flatRows = new List<Map<String, Object>>();
+                List<String> cols = expanded.fields != null
+                    ? expanded.fields
+                    : parseSelectColumns(query.trim());
+                if (cols != null) {
+                    List<String> displayCols = new List<String>(cols);
+                    if (expanded.fields != null) displayCols.sort();
+                    result.columns = displayCols;
+                    for (SObject record : records) {
+                        Map<String, Object> row = new Map<String, Object>();
+                        for (String col : cols) {
+                            row.put(col, resolveFieldValue(record, col));
+                        }
+                        flatRows.add(row);
+                    }
+                } else {
+                    Set<String> colSet = new Set<String>();
+                    for (SObject record : records) {
+                        Map<String, Object> flat = flattenRecord(record);
+                        colSet.addAll(flat.keySet());
+                        flatRows.add(flat);
+                    }
+                    result.columns = new List<String>(colSet);
+                    result.columns.sort();
+                }
+                result.rows = flatRows;
             }
             result.totalRows = records.size();
         } catch (Exception e) {

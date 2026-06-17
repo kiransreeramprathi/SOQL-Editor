@@ -9,6 +9,8 @@ import getOrgLimits       from '@salesforce/apex/OrgMetadataController.getOrgLim
 import getRecord          from '@salesforce/apex/OrgMetadataController.getRecord';
 import updateRecord       from '@salesforce/apex/OrgMetadataController.updateRecord';
 import getPicklistValues  from '@salesforce/apex/OrgMetadataController.getPicklistValues';
+import getCurrentUser     from '@salesforce/apex/OrgMetadataController.getCurrentUser';
+import searchUsers        from '@salesforce/apex/OrgMetadataController.searchUsers';
 
 const PAGE_SIZE  = 50;
 const HISTORY_MAX = 20;
@@ -110,6 +112,20 @@ export default class SoqlEditor extends LightningElement {
     @track orgLimits       = {};
     @track isLoadingLimits = false;
 
+    // ── User Inspector tab ────────────────────────────────────
+    @track currentUser        = null;
+    @track isLoadingUser      = false;
+    @track userSearchTerm     = '';
+    @track userSearchResults  = [];
+    @track isSearchingUsers   = false;
+    @track selectedUserId     = '';
+    @track selectedUserRecord = null;
+    @track isLoadingUserRec   = false;
+    @track userDropdownOpen   = false;
+    _userSearched    = false;
+    _selectedUserData = null;
+    _searchDebounce  = null;
+
     objectsLoaded = false;
 
     // ════════════════════════════════════════════════════════
@@ -119,6 +135,7 @@ export default class SoqlEditor extends LightningElement {
         this.loadObjects();
         this.loadOrgLimits();
         this._loadSavedQueries();
+        this.loadCurrentUser();
     }
 
     // ════════════════════════════════════════════════════════
@@ -250,6 +267,7 @@ export default class SoqlEditor extends LightningElement {
             this._sortCol = col;
             this._sortAsc = true;
         }
+        this.columns = [...this.columns]; // trigger reactive re-render for non-@track sort state
     }
 
     _orderedColumns(serverCols, soql) {
@@ -749,6 +767,78 @@ export default class SoqlEditor extends LightningElement {
     }
 
     // ════════════════════════════════════════════════════════
+    //  USER INSPECTOR
+    // ════════════════════════════════════════════════════════
+    async loadCurrentUser() {
+        this.isLoadingUser = true;
+        try {
+            this.currentUser = await getCurrentUser();
+        } catch (err) {
+            // non-critical — silently swallow
+        } finally {
+            this.isLoadingUser = false;
+        }
+    }
+
+    handleUserSearch(event) {
+        this.userSearchTerm   = event.detail.value;
+        this.userDropdownOpen = true;
+        clearTimeout(this._searchDebounce);
+        if (!this.userSearchTerm.trim()) {
+            this.userSearchResults = [];
+            this.userDropdownOpen  = false;
+            this._userSearched     = false;
+            return;
+        }
+        this._searchDebounce = setTimeout(() => { this.runUserSearch(); }, 300);
+    }
+
+    handleUserSearchBlur() {
+        setTimeout(() => { this.userDropdownOpen = false; }, 200);
+    }
+
+    handleDropdownMousedown(event) { event.preventDefault(); }
+
+    async runUserSearch() {
+        if (!this.userSearchTerm.trim()) return;
+        this.isSearchingUsers  = true;
+        this.userSearchResults = [];
+        try {
+            this.userSearchResults = await searchUsers({ searchTerm: this.userSearchTerm });
+            this._userSearched = true;
+        } catch (err) {
+            this.toast('Search Failed', err.body?.message || err.message, 'error');
+        } finally {
+            this.isSearchingUsers = false;
+        }
+    }
+
+    async selectUser(event) {
+        const userId            = event.currentTarget.dataset.id;
+        this.selectedUserId     = userId;
+        this.selectedUserRecord = null;
+        this.userDropdownOpen   = false;
+        const found = (this.userSearchResults || []).find(u => u.Id === userId);
+        if (found) {
+            this.userSearchTerm    = found.Name;
+            this._selectedUserData = found;
+        }
+        this.isLoadingUserRec = true;
+        try {
+            const data = await getRecord({ recordId: userId });
+            if (data.error) { this.toast('Error', data.error, 'error'); return; }
+            this.selectedUserRecord = Object.entries(data)
+                .filter(([k]) => k !== '__objectType__')
+                .map(([k, v]) => ({ key: k, label: k, val: v == null ? '' : String(v) }))
+                .sort((a, b) => a.key.localeCompare(b.key));
+        } catch (err) {
+            this.toast('Error', err.body?.message || err.message, 'error');
+        } finally {
+            this.isLoadingUserRec = false;
+        }
+    }
+
+    // ════════════════════════════════════════════════════════
     //  GETTERS — SOQL
     // ════════════════════════════════════════════════════════
     get containerClass()  { return `soql-wrap${this.utilityMode ? ' utility-mode' : ''}`; }
@@ -791,6 +881,34 @@ export default class SoqlEditor extends LightningElement {
     get pageInfo()        { return `Page ${this.currentPage} of ${this.totalPages}`; }
     get hasHistory()      { return this._qh.length > 0; }
     get hasSavedQueries() { return this.savedQueriesList.length > 0; }
+
+    // ════════════════════════════════════════════════════════
+    //  GETTERS — USER INSPECTOR
+    // ════════════════════════════════════════════════════════
+    get currentUserUrl()     { return this.currentUser ? `/${this.currentUser.Id}` : '#'; }
+    get selectedUserUrl()    { return this.selectedUserId ? `/${this.selectedUserId}` : '#'; }
+    get showUserEmptyState() { return !this.isLoadingUserRec && !this.selectedUserRecord; }
+    get userDropdownVisible() {
+        return this.userDropdownOpen && this.userSearchTerm.trim().length > 0 &&
+               (this.isSearchingUsers || this._userSearched);
+    }
+    get noUserResults() {
+        return this._userSearched && !this.isSearchingUsers && this.userSearchResults.length === 0;
+    }
+    get selectedUserBrief() {
+        if (!this._selectedUserData) return null;
+        const u = this._selectedUserData;
+        return { ...u, statusLabel: u.IsActive ? 'Active' : 'Inactive', statusClass: u.IsActive ? 'user-badge-active' : 'user-badge-inactive' };
+    }
+    get userResultsList() {
+        return (this.userSearchResults || []).map(u => ({
+            ...u,
+            dropdownItemClass: `user-dd-item${this.selectedUserId === u.Id ? ' user-dd-item_active' : ''}`,
+            itemClass:   `obj-item${this.selectedUserId === u.Id ? ' obj-item_active' : ''}`,
+            statusLabel: u.IsActive ? 'Active' : 'Inactive',
+            statusClass: u.IsActive ? 'user-badge-active' : 'user-badge-inactive'
+        }));
+    }
 
     get acBarLabel() {
         const ctx = this._acContext;

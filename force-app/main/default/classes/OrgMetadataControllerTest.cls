@@ -138,4 +138,46 @@ private class OrgMetadataControllerTest {
         Test.stopTest();
         Assert.areEqual('success', result);
     }
+
+    // ── getCurrentUser ──────────────────────────────────────────
+
+    @isTest
+    static void testGetCurrentUser_returnsCurrentUser() {
+        Test.startTest();
+        Map<String, Object> u = OrgMetadataController.getCurrentUser();
+        Test.stopTest();
+        Assert.isNotNull(u.get('Id'),       'Should return current user Id');
+        Assert.isNotNull(u.get('Name'),     'Should return current user Name');
+        Assert.isNotNull(u.get('Username'), 'Should return current user Username');
+        Assert.areEqual(UserInfo.getUserId(), u.get('Id'), 'Id should match running user');
+    }
+
+    // ── searchUsers ─────────────────────────────────────────────
+
+    @isTest
+    static void testSearchUsers_blank() {
+        Test.startTest();
+        List<Map<String, Object>> results = OrgMetadataController.searchUsers('');
+        Test.stopTest();
+        Assert.areEqual(0, results.size(), 'Blank search term should return empty list');
+    }
+
+    @isTest
+    static void testSearchUsers_found() {
+        String name = UserInfo.getName();
+        Test.startTest();
+        List<Map<String, Object>> results =
+            OrgMetadataController.searchUsers(name.substring(0, Math.min(3, name.length())));
+        Test.stopTest();
+        Assert.isNotNull(results, 'Should return a non-null list');
+    }
+
+    @isTest
+    static void testSearchUsers_noMatch() {
+        Test.startTest();
+        List<Map<String, Object>> results =
+            OrgMetadataController.searchUsers('XYZXYZ_NoMatch_99999');
+        Test.stopTest();
+        Assert.areEqual(0, results.size(), 'No-match search should return empty list');
+    }
 }

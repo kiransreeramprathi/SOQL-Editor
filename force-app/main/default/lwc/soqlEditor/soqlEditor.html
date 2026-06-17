@@ -404,6 +404,169 @@
                 </div>
             </lightning-tab>
 
+            <!-- ===== USER INSPECTOR TAB ===== -->
+            <lightning-tab label="User Inspector" value="users" icon-name="utility:user">
+                <div class="tab-body">
+
+                    <!-- Current User Banner -->
+                    <template lwc:if={isLoadingUser}>
+                        <div class="spinner-wrap">
+                            <lightning-spinner alternative-text="Loading user..." size="small"></lightning-spinner>
+                        </div>
+                    </template>
+                    <template lwc:if={currentUser}>
+                        <div class="slds-card slds-m-bottom_small">
+                            <div class="slds-card__body slds-card__body_inner">
+                                <div class="user-banner">
+                                    <div class="user-banner-info">
+                                        <div class="user-banner-name">{currentUser.Name}</div>
+                                        <div class="user-banner-sub">{currentUser.Username}</div>
+                                        <div class="user-banner-meta">
+                                            <span>{currentUser.Email}</span>
+                                            <span class="user-banner-sep">·</span>
+                                            <span>{currentUser.Profile}</span>
+                                            <template lwc:if={currentUser.Title}>
+                                                <span class="user-banner-sep">·</span>
+                                                <span>{currentUser.Title}</span>
+                                            </template>
+                                            <template lwc:if={currentUser.Department}>
+                                                <span class="user-banner-sep">·</span>
+                                                <span>{currentUser.Department}</span>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <a href={currentUserUrl} target="_blank" class="slds-button slds-button_neutral">Open My Record ↗</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Search + Detail Grid -->
+                    <div class="slds-grid slds-gutters">
+
+                        <!-- Left: Search Panel -->
+                        <div class="slds-col slds-size_1-of-3">
+                            <div class="slds-card">
+                                <div class="slds-card__header">
+                                    <h2 class="slds-card__header-title">Search Users</h2>
+                                </div>
+                                <div class="slds-card__body slds-card__body_inner">
+                                    <div class="user-search-wrap">
+                                        <lightning-input
+                                            label=""
+                                            placeholder="Name, username, or email..."
+                                            value={userSearchTerm}
+                                            onchange={handleUserSearch}
+                                            onblur={handleUserSearchBlur}
+                                            type="search"
+                                        ></lightning-input>
+                                        <template lwc:if={userDropdownVisible}>
+                                            <div class="user-dropdown">
+                                                <template lwc:if={isSearchingUsers}>
+                                                    <div class="user-dd-loader">
+                                                        <lightning-spinner alternative-text="Searching..." size="x-small"></lightning-spinner>
+                                                    </div>
+                                                </template>
+                                                <template lwc:else>
+                                                    <template for:each={userResultsList} for:item="u">
+                                                        <div key={u.Id}
+                                                            class={u.dropdownItemClass}
+                                                            onmousedown={handleDropdownMousedown}
+                                                            onclick={selectUser}
+                                                            data-id={u.Id}>
+                                                            <div class="slds-grid slds-grid_vertical-align-center slds-grid_align-spread">
+                                                                <div class="slds-grow slds-has-flexi-truncate">
+                                                                    <div class="user-dd-name slds-truncate">{u.Name}</div>
+                                                                    <div class="user-dd-sub slds-truncate">{u.Username}</div>
+                                                                    <div class="user-dd-sub">{u.Profile}</div>
+                                                                </div>
+                                                                <span class={u.statusClass}>{u.statusLabel}</span>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                    <template lwc:if={noUserResults}>
+                                                        <div class="user-dd-empty">No matching users found</div>
+                                                    </template>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <template lwc:if={selectedUserBrief}>
+                                        <div class="user-selected-badge slds-m-top_x-small">
+                                            <div class="user-dd-name">{selectedUserBrief.Name}</div>
+                                            <div class="user-dd-sub">{selectedUserBrief.Username}</div>
+                                            <div class="slds-m-top_xx-small">
+                                                <span class={selectedUserBrief.statusClass}>{selectedUserBrief.statusLabel}</span>
+                                                <span class="user-dd-sub slds-m-left_x-small">{selectedUserBrief.Profile}</span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: User Detail Panel -->
+                        <div class="slds-col slds-size_2-of-3">
+                            <template lwc:if={isLoadingUserRec}>
+                                <div class="spinner-wrap">
+                                    <lightning-spinner alternative-text="Loading user..." size="medium"></lightning-spinner>
+                                </div>
+                            </template>
+                            <template lwc:if={selectedUserRecord}>
+                                <div class="slds-card">
+                                    <div class="slds-card__header slds-grid">
+                                        <header class="slds-media slds-media_center slds-has-flexi-truncate">
+                                            <div class="slds-media__body">
+                                                <h2 class="slds-card__header-title">User Fields</h2>
+                                            </div>
+                                            <div class="slds-no-flex">
+                                                <a href={selectedUserUrl} target="_blank" class="slds-button slds-button_neutral open-record-btn">Open Record ↗</a>
+                                            </div>
+                                        </header>
+                                    </div>
+                                    <div class="slds-card__body">
+                                        <div class="table-scroll-wrap">
+                                            <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Field</th>
+                                                        <th>Value</th>
+                                                        <th></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <template for:each={selectedUserRecord} for:item="row">
+                                                        <tr key={row.key}>
+                                                            <td class="mono">{row.label}</td>
+                                                            <td class="cell-val-wide">{row.val}</td>
+                                                            <td>
+                                                                <lightning-button-icon
+                                                                    icon-name="utility:copy"
+                                                                    alternative-text="Copy Value"
+                                                                    onclick={copyText}
+                                                                    data-value={row.val}
+                                                                    variant="bare"
+                                                                    size="small"
+                                                                ></lightning-button-icon>
+                                                            </td>
+                                                        </tr>
+                                                    </template>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                            <template lwc:if={showUserEmptyState}>
+                                <div class="empty-state">Search and select a user to view their details</div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </lightning-tab>
+
         </lightning-tabset>
     </div>
 </template>

@@ -50,6 +50,30 @@ private class SoqlEditorControllerTest {
         Assert.isTrue(r.rows.isEmpty());
     }
 
+    @isTest
+    static void testExecuteQuery_fieldsStandard() {
+        SoqlEditorController.QueryResult r =
+            SoqlEditorController.executeQuery('SELECT FIELDS(STANDARD) FROM Account LIMIT 1');
+        Assert.isNull(r.error, 'FIELDS(STANDARD) should expand and execute without error');
+        Assert.isTrue(r.columns.contains('Id'), 'Expanded query should include Id column');
+    }
+
+    @isTest
+    static void testExecuteQuery_fieldsCustom() {
+        SoqlEditorController.QueryResult r =
+            SoqlEditorController.executeQuery('SELECT FIELDS(CUSTOM) FROM Account LIMIT 1');
+        Assert.isNull(r.error, 'FIELDS(CUSTOM) should expand and execute without error');
+    }
+
+    @isTest
+    static void testExecuteQuery_allColumnsFromAllRecords() {
+        SoqlEditorController.QueryResult r =
+            SoqlEditorController.executeQuery('SELECT Id, Name FROM Account');
+        Assert.isNull(r.error);
+        Assert.isTrue(r.columns.contains('Id'));
+        Assert.isTrue(r.columns.contains('Name'));
+    }
+
     // ── executeQueryAll ─────────────────────────────────────────
 
     @isTest

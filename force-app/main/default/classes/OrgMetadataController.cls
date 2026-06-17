@@ -139,6 +139,69 @@ public with sharing class OrgMetadataController {
         }
     }
 
+    @AuraEnabled(cacheable=true)
+    public static Map<String, Object> getCurrentUser() {
+        User u = [
+            SELECT Id, Name, Username, Email, IsActive, ProfileId, Profile.Name,
+                   UserType, Title, Department, CompanyName, Phone, MobilePhone,
+                   TimeZoneSidKey, LanguageLocaleKey, LocaleSidKey,
+                   CreatedDate, LastLoginDate, LastModifiedDate,
+                   ManagerId, Manager.Name, Division
+            FROM User
+            WHERE Id = :UserInfo.getUserId()
+            LIMIT 1
+        ];
+        Map<String, Object> result = new Map<String, Object>();
+        result.put('Id',            u.Id);
+        result.put('Name',          u.Name);
+        result.put('Username',      u.Username);
+        result.put('Email',         u.Email);
+        result.put('IsActive',      u.IsActive);
+        result.put('Profile',       u.Profile != null ? u.Profile.Name : '');
+        result.put('UserType',      u.UserType);
+        result.put('Title',         u.Title);
+        result.put('Department',    u.Department);
+        result.put('CompanyName',   u.CompanyName);
+        result.put('Phone',         u.Phone);
+        result.put('MobilePhone',   u.MobilePhone);
+        result.put('TimeZone',      u.TimeZoneSidKey);
+        result.put('LastLoginDate', u.LastLoginDate != null ? String.valueOf(u.LastLoginDate) : '');
+        result.put('CreatedDate',   u.CreatedDate != null ? String.valueOf(u.CreatedDate) : '');
+        result.put('Manager',       u.Manager != null ? u.Manager.Name : '');
+        result.put('Division',      u.Division);
+        return result;
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static List<Map<String, Object>> searchUsers(String searchTerm) {
+        if (String.isBlank(searchTerm)) return new List<Map<String, Object>>();
+        String term = '%' + String.escapeSingleQuotes(searchTerm.trim()) + '%';
+        List<User> users = [
+            SELECT Id, Name, Username, Email, IsActive, Profile.Name,
+                   UserType, Title, Department, LastLoginDate
+            FROM User
+            WHERE Name LIKE :term OR Username LIKE :term OR Email LIKE :term
+            ORDER BY Name
+            LIMIT 20
+        ];
+        List<Map<String, Object>> result = new List<Map<String, Object>>();
+        for (User u : users) {
+            result.add(new Map<String, Object>{
+                'Id'            => u.Id,
+                'Name'          => u.Name,
+                'Username'      => u.Username,
+                'Email'         => u.Email,
+                'IsActive'      => u.IsActive,
+                'Profile'       => u.Profile != null ? u.Profile.Name : '',
+                'UserType'      => u.UserType,
+                'Title'         => u.Title,
+                'Department'    => u.Department,
+                'LastLoginDate' => u.LastLoginDate != null ? String.valueOf(u.LastLoginDate) : ''
+            });
+        }
+        return result;
+    }
+
     @AuraEnabled
     public static Map<String, Object> getRecord(String recordId) {
         Map<String, Object> result = new Map<String, Object>();
