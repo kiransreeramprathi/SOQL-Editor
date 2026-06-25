@@ -119,13 +119,17 @@
                                         type="search"
                                     ></lightning-input>
                                 </div>
-                                <div class="table-scroll-wrap slds-m-top_x-small">
+                                <div class="table-scroll-wrap result-table-scroll slds-m-top_x-small">
                                     <table class="slds-table slds-table_cell-buffer slds-table_bordered result-table">
                                         <thead>
                                             <tr class="slds-line-height_reset">
                                                 <template for:each={columnHeaders} for:item="col">
-                                                    <th key={col.name} scope="col" title={col.name} onclick={handleSortColumn} data-col={col.name} class="sortable-col">
-                                                        <div class="slds-truncate col-header">{col.label}</div>
+                                                    <th key={col.name} scope="col" title={col.name} onclick={handleSortColumn} data-col={col.name} class="sortable-col" style={col.headerStyle}>
+                                                        <div class="col-header-inner">
+                                                            <div class="slds-truncate col-header">{col.label}</div>
+                                                            <button type="button" class={col.wrapBtnClass} data-col={col.name} onclick={handleWrapToggle} title={col.wrapBtnTitle}>W</button>
+                                                        </div>
+                                                        <div class="resize-handle" data-col={col.name} onmousedown={handleResizeMousedown}></div>
                                                     </th>
                                                 </template>
                                             </tr>
@@ -135,7 +139,12 @@
                                                 <tr key={row._key}>
                                                     <template for:each={row.cells} for:item="cell">
                                                         <td key={cell.key} onclick={copyCell} data-value={cell.val} title="Click to copy" class="clickable-cell">
-                                                            <div class="slds-truncate cell-val">{cell.val}</div>
+                                                            <div class={cell.cellClass}>
+                                                                <template lwc:if={cell.isId}>
+                                                                    <a href={cell.recordUrl} target="_blank" class="id-link" onclick={handleIdLinkClick}>{cell.val}</a>
+                                                                </template>
+                                                                <template lwc:else>{cell.val}</template>
+                                                            </div>
                                                         </td>
                                                     </template>
                                                 </tr>
@@ -147,11 +156,6 @@
                                             </template>
                                         </tbody>
                                     </table>
-                                </div>
-                                <div class="pagination slds-m-top_small">
-                                    <lightning-button label="‹ Prev" onclick={prevPage} disabled={isFirstPage}></lightning-button>
-                                    <span class="page-info">{pageInfo}</span>
-                                    <lightning-button label="Next ›" onclick={nextPage} disabled={isLastPage}></lightning-button>
                                 </div>
                             </div>
                         </div>

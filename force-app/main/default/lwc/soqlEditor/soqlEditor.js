@@ -12,7 +12,6 @@ import getPicklistValues  from '@salesforce/apex/OrgMetadataController.getPickli
 import getCurrentUser     from '@salesforce/apex/OrgMetadataController.getCurrentUser';
 import searchUsers        from '@salesforce/apex/OrgMetadataController.searchUsers';
 
-const PAGE_SIZE  = 50;
 const HISTORY_MAX = 20;
 const AC_LIMIT   = 15;
 const SAVED_MAX  = 50;
@@ -69,13 +68,14 @@ export default class SoqlEditor extends LightningElement {
     @track queryResult   = null;
     @track isLoading     = false;
     @track errorMessage  = '';
-    @track currentPage   = 1;
     @track useToolingApi = false;
     @track useQueryAll   = false;
     @track resultFilter  = '';
     _sortCol = '';
     _sortAsc = true;
     _qh = [];
+    @track _wrappedColsObj = {};
+    @track _colWidths      = {};
 
     // ── Autocomplete ──────────────────────────────────────────
     @track acSuggestions = [];
@@ -215,7 +215,6 @@ export default class SoqlEditor extends LightningElement {
         this.isLoading    = true;
         this.errorMessage = '';
         this.queryResult  = null;
-        this.currentPage  = 1;
         this.resultFilter = '';
         this._sortCol     = '';
         this._sortAsc     = true;
@@ -256,7 +255,6 @@ export default class SoqlEditor extends LightningElement {
 
     handleResultFilter(event) {
         this.resultFilter = event.detail.value;
-        this.currentPage  = 1;
     }
 
     handleSortColumn(event) {
@@ -326,9 +324,6 @@ export default class SoqlEditor extends LightningElement {
         this._setTextareaValue(this.query);
     }
 
-    prevPage() { if (this.currentPage > 1) this.currentPage--; }
-    nextPage()  { if (this.currentPage < this.totalPages) this.currentPage++; }
-
     // ── Export ─────────────────────────────────────────────────
     exportCSV()    { const r = this.filteredRows; if (!r.length) return; this._copyData(this._buildCSV(','),  `${r.length} rows copied as CSV`); }
     exportJSON()   { const r = this.filteredRows; if (!r.length) return; this._copyData(JSON.stringify(r, null, 2), `${r.length} rows copied as JSON`); }
@@ -386,6 +381,33 @@ export default class SoqlEditor extends LightningElement {
     }
 
     copyCell(event) { this.copyToClipboard(event.currentTarget.dataset.value); }
+
+    handleIdLinkClick(event) { event.stopPropagation(); }
+
+    handleWrapToggle(event) {
+        event.stopPropagation();
+        const col = event.currentTarget.dataset.col;
+        this._wrappedColsObj = { ...this._wrappedColsObj, [col]: !this._wrappedColsObj[col] };
+    }
+
+    handleResizeMousedown(event) {
+        event.stopPropagation();
+        event.preventDefault();
+        const col    = event.currentTarget.dataset.col;
+        const th     = event.currentTarget.closest('th');
+        const startX = event.clientX;
+        const startW = th ? th.offsetWidth : (this._colWidths[col] || 150);
+        const onMove = (e) => {
+            const newW = Math.max(60, startW + (e.clientX - startX));
+            this._colWidths = { ...this._colWidths, [col]: newW };
+        };
+        const onUp = () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+    }
 
     // ════════════════════════════════════════════════════════
     //  SAVED QUERIES
@@ -875,10 +897,6 @@ export default class SoqlEditor extends LightningElement {
         }
         return `${total} record${total !== 1 ? 's' : ''} returned`;
     }
-    get totalPages()      { return Math.max(1, Math.ceil(this.filteredRows.length / PAGE_SIZE)); }
-    get isFirstPage()     { return this.currentPage <= 1; }
-    get isLastPage()      { return this.currentPage >= this.totalPages; }
-    get pageInfo()        { return `Page ${this.currentPage} of ${this.totalPages}`; }
     get hasHistory()      { return this._qh.length > 0; }
     get hasSavedQueries() { return this.savedQueriesList.length > 0; }
 
@@ -921,21 +939,31 @@ export default class SoqlEditor extends LightningElement {
 
     get columnHeaders() {
         return this.columns.map(col => ({
-            name:  col,
-            label: col + (this._sortCol === col ? (this._sortAsc ? ' ▲' : ' ▼') : '')
+            name:         col,
+            label:        col + (this._sortCol === col ? (this._sortAsc ? ' ▲' : ' ▼') : ''),
+            wrapBtnClass: `wrap-toggle${this._wrappedColsObj[col] ? ' wrap-toggle--on' : ''}`,
+            wrapBtnTitle: this._wrappedColsObj[col] ? 'Disable wrap' : 'Enable wrap',
+            headerStyle:  this._colWidths[col] ? `width:${this._colWidths[col]}px;min-width:${this._colWidths[col]}px` : 'width:150px;min-width:60px'
         }));
     }
 
-    get pagedRows() {
-        const rows = this.filteredRows;
-        const s = (this.currentPage - 1) * PAGE_SIZE;
-        return rows.slice(s, s + PAGE_SIZE);
-    }
-
     get processedRows() {
-        return this.pagedRows.map((row, ri) => ({
+        const sfIdRegex = /^[a-zA-Z0-9]{15}$|^[a-zA-Z0-9]{18}$/;
+        return this.filteredRows.map((row, ri) => ({
             _key:  String(ri),
-            cells: this.columns.map((col, ci) => ({ key: `${ri}-${ci}`, val: row[col] == null ? '' : String(row[col]) }))
+            cells: this.columns.map((col, ci) => {
+                const val       = row[col] == null ? '' : String(row[col]);
+                const colLower  = col.toLowerCase();
+                const isId      = (colLower === 'id' || colLower.endsWith('id')) && sfIdRegex.test(val);
+                const isWrapped = !!this._wrappedColsObj[col];
+                return {
+                    key:       `${ri}-${ci}`,
+                    val,
+                    isId,
+                    recordUrl: isId ? `/${val}` : '',
+                    cellClass: isWrapped ? 'cell-val cell-val--wrap' : 'cell-val'
+                };
+            })
         }));
     }
 

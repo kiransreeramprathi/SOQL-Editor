@@ -91,9 +91,11 @@
     border-radius: 4px;
 }
 
-.col-header { min-width: 100px; max-width: 280px; font-weight: bold; white-space: nowrap; }
+.col-header-inner { display: flex; align-items: center; gap: 4px; overflow: hidden; padding-right: 8px; }
+.col-header { font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
 
 .sortable-col {
+    position: relative;
     cursor: pointer;
     user-select: none;
 }
@@ -121,8 +123,55 @@
 .clickable-cell { cursor: pointer; }
 .clickable-cell:hover { background: #e8f4ff !important; }
 
-.cell-val     { max-width: 280px; }
+.cell-val      { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cell-val--wrap { white-space: normal; word-break: break-word; overflow: visible; text-overflow: clip; }
 .cell-val-wide { max-width: 400px; word-break: break-all; white-space: pre-wrap; }
+
+/* ── Result table — fixed layout + full borders + ID links ─── */
+.result-table { table-layout: fixed; }
+
+.result-table td,
+.result-table th {
+    border: 1px solid #d8dde6 !important;
+}
+
+/* ── Resize handle ───────────────────────────────────── */
+.resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: col-resize;
+    z-index: 3;
+    background: transparent;
+}
+.resize-handle:hover { background: rgba(21,137,238,0.25); }
+
+/* ── Wrap toggle ─────────────────────────────────────── */
+.wrap-toggle {
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid #c9c7c5;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 1px 4px;
+    color: #706e6b;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.wrap-toggle:hover            { background: #e8f4ff; border-color: #0070d2; color: #0070d2; }
+.wrap-toggle--on              { background: #0070d2; border-color: #0070d2; color: #fff; }
+.wrap-toggle--on:hover        { background: #005fb2; }
+
+.result-table-scroll {
+    max-height: 70vh;
+}
+
+.id-link { color: #0070d2; text-decoration: none; }
+.id-link:hover { text-decoration: underline; }
 
 /* ── Pagination ─────────────────────────────────────── */
 .pagination {
